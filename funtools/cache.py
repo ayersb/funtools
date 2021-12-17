@@ -77,24 +77,6 @@ def cache(func, contextless=False):
         data = func_cache[args_key]
         return data
 
-        # if not
-        #     cache_context = contextless or self.get_cache_context()
-        #     self._data_cache[cache_context][func_name] = (
-        #         (args, kwargs_entries),
-        #         data,
-        #     )
-        # else:
-        #     cache_args, data = self._data_cache.get(func_name)
-        #     if cache_args != (self.get_cache_context(), args, kwargs_entries):
-        #         data = func(self, *args, **kwargs)
-        #         if not self.get_cache_context() in self._data_cache:
-        #             self._data_cache[self.get_cache_context()] = {}
-        #         self._data_cache[self.get_cache_context()][func_name] = (
-        #             (args, kwargs_entries),
-        #             data,
-        #         )
-        # return data
-
     return wrapper
 
 
