@@ -1,11 +1,39 @@
 import json
 from functools import reduce
-from collections.abc import Iterable
+from collections.abc import Mapping, Sequence, Iterable, Callable
+from typing import TypeVar, Tuple, Set, List, Dict, Union
+from inspect import signature
 
 import pyperclip
 
+T = TypeVar("T")
+O = TypeVar("O")
 
-class _FunWrap(Iterable):
+V = TypeVar("V")
+K = TypeVar("K")
+
+
+def _fun_map(fn, *itterables):
+    l = []
+    sig = signature(fn)
+    for lentry in itterables:
+        for i, x in enumerate(lentry):
+            if len(signature(fn).parameters) > 1:  # TODO: Ignore kwargs
+                l.append(fn(x, i))
+            else:
+                l.append(fn(x))
+    return l
+
+
+def _fun_dict_map(fn, dictionary):
+    res = []
+    for key, value in dictionary.items():  # pylint: disable=no-member
+        o = funwrap(fn(key, value))
+        res.append(o)
+    return res
+
+
+class _FunWrap(Iterable[T]):
     def pbcopy_json(self):
         self.pbcopy(as_json=True)
 
@@ -15,20 +43,19 @@ class _FunWrap(Iterable):
             data = json.dumps(self, indent=2)
         pyperclip.copy(data)
 
-    def map(self, fn):
+    def map(self, fn: Callable[[T], O]) -> Iterable[O]:
+        """Returns a new FunCollection after applying fn to each element of the collection"""
         if isinstance(self, dict):
-            res = []
-            for key, value in self.items():  # pylint: disable=no-member
-                o = funwrap(fn(key, value))
-                res.append(o)
+            res = _fun_dict_map(fn, self)
             try:
                 return FunDict(dict(res))
             except Exception:
                 return FunList(res)
         elif isinstance(self, set):
-            return FunSet(map(fn, self))
+            return FunSet(_fun_map(fn, self))
         else:
-            return FunList(map(fn, self))
+            # TODO: Handle indexs
+            return FunList(_fun_map(fn, self))
 
     def reduce(self, fn, initial=None):
         def dict_wrap_fn(col, kvp):
@@ -61,24 +88,24 @@ class _FunWrap(Iterable):
             items.sort(**kwargs)
             return FunList(items)
 
-    # def unwrap(self):
-    #     return
+    def sum(self):
+        return sum(self)
 
 
-class FunDict(dict, _FunWrap):
-    def __init__(self, d):
+class FunDict(Dict[K, V], _FunWrap):
+    def __init__(self, d: Dict[K, V]):
         super().__init__(d)
 
-    def items(self):
+    def items(self) -> List[Tuple[K, V]]:
         return FunList(super().items())
 
-    def keys(self):
+    def keys(self) -> List[K]:
         return FunList(super().keys())
 
-    def values(self):
+    def values(self) -> List[V]:
         return FunList(super().values())
 
-    def select(self, keys):
+    def select(self, keys: Sequence[K]) -> Dict[K, V]:
         d = FunDict({})
         for key in keys:
             alias = key
@@ -88,7 +115,7 @@ class FunDict(dict, _FunWrap):
             d[alias] = self[key]
         return d
 
-    def filter_keys(self, fn):
+    def kfilter(self, fn: Callable[[K], bool]) -> Dict[K, V]:
         kl = set(filter(fn, self.keys()))
         d = {}
         for k in self.keys():
@@ -96,33 +123,70 @@ class FunDict(dict, _FunWrap):
                 d[k] = self[k]
         return FunDict(d)
 
-    def filter_values(self, fn):
+    def vfilter(self, fn: Callable[[V], bool]) -> Dict[K, V]:
         d = {}
         for k, v in self.items():
             if fn(v):
                 d[k] = self[k]
         return FunDict(d)
 
-    def sort_keys(self, **kwargs):
-        sorted_keys = sorted(list(self.keys()), **kwargs)
-        sd = {}
-        for key in sorted_keys:
-            sd[key] = self[key]
-        return FunDict(sd)
+    def ksort(self, fn) -> Dict[K, V]:
+        sorted_items = sorted(self.items(), key=lambda t: fn(t[0]))
+        return FunDict(sorted_items)
 
-    def invert(self):
+    def vsort(self, fn) -> Dict[K, V]:
+        sorted_items = sorted(self.items(), key=lambda t: fn(t[1]))
+        return FunDict(sorted_items)
+
+    def invert(self, smart_flatten=True) -> Dict[K, Sequence[V]]:
+        if not len(self):
+            return {}
+        entry_types = {
+            'dict': 0,
+            'str': 0,
+            'int': 0,
+            'float': 0
+        }
         for v in self.values():
-            if not isinstance(v, dict):
-                raise ValueError("Can only invert keys of nested dicts!")
+            if isinstance(v, dict):
+                entry_types['dict'] += 1
+            elif isinstance(v, str):
+                entry_types['str'] += 1
+            elif isinstance(v, int):
+                entry_types['int'] += 1
+            elif isinstance(v, float):
+                entry_types['float'] += 1
+            else:
+                raise RuntimeError("Only dicts with keys of types '%s' can be inverted, but type %s found" % (str(entry_types), type(v)))
+
+        types_present = list(filter(lambda t: t[1], entry_types.items()))
+        if len(types_present) > 1:
+            # TODO: make print more pretty
+            raise RuntimeError("Only dicts with keys of *one* matching type can be inverted, but %s found" % str(entry_types))
+        key_type = types_present.pop()[0]
         nd = FunDict({})
-        for okey, cdict in self.items():
-            for nkey, v in cdict.items():
-                if nkey not in nd:
-                    nd[nkey] = {}
-                if okey not in nd[nkey]:
-                    nd[nkey][okey] = v
-                else:
-                    raise KeyError("Well that's confusing")
+        for k0, v0 in self.items():
+            if key_type == 'dict':
+                for nkey, v in cdict.items():
+                    if nkey not in nd:
+                        nd[nkey] = {}
+                    if okey not in nd[nkey]:
+                        nd[nkey][okey] = v
+                    else:
+                        raise KeyError("Well that's confusing")
+            else:
+                if v0 not in nd:
+                    nd[v0] = []
+                nd[v0].append(k0)
+
+        if smart_flatten:
+            # If all values lists are of lenth one, unwrap them before returning
+            # Makes it less annoying to work with data where k -> v mapping is 1:1
+            lset = set(map(len, nd.values()))
+            if len(lset) == 1 and 1 in lset:
+                for k, v in list(nd.items()):
+                    nd[k] = v[0]
+        return nd
 
     def length_keys(self):
         return len(self)
@@ -139,7 +203,7 @@ class FunDict(dict, _FunWrap):
         return ll
 
 
-class FunList(list, _FunWrap):
+class FunList(List[T], _FunWrap):
     def __init__(self, l=None):
         if not l:
             l = []
@@ -229,7 +293,7 @@ class FunSet(set, _FunWrap):
         return FunList(self)
 
 
-def funwrap(collection):
+def funwrap(collection: Iterable[T]):
     def match(x, types):
         return bool(list(filter(lambda t: isinstance(x, t), types)))
 
