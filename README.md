@@ -4,7 +4,7 @@ Python tools for use in interactive shells
 
 ## FunWrap
 
-This package provides several classes that wrap around basic collect types and allow manipulation of the collections using a functional programming style operations. _The operations are not optimized from a performance standpoint and shouldn't be used in production code_, but can be very helpful for doing quick manipulations of data in an environment like a `ipython` shell.
+This package provides several classes that wrap around basic collect types and allow manipulation of the collections using a functional programming style operations. _The operations are not optimized from a performance standpoint and shouldn't be used in production code_, but can be very helpful for doing quick manipulations of data in an environment like an `ipython` shell.
 
 Some brief examples
 
@@ -23,7 +23,7 @@ This package provides a class and decorators that can be used to create versions
 
 A hypothetical example:
 
-```
+```python
 c = MyCachedCloudComputeApiClient(profile=/foo/bar/config)
 slist = c.list_regions() # Get a list of all regions from your cloud platform API
  .map(lambda r: c.list_compute(region=r.id)) # Fetches all VMs for each region, this could take a while
