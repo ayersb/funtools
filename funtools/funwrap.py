@@ -1,7 +1,8 @@
+from __future__ import annotations
 import json
 from functools import reduce
 from collections.abc import Mapping, Sequence, Iterable, Callable
-from typing import TypeVar, Tuple, Set, List, Dict, Union
+from typing import TypeVar, Tuple, Set, List, Dict, Union, Type, Any
 from inspect import signature
 
 import pyperclip
@@ -88,34 +89,51 @@ class _FunWrap(Iterable[T]):
             items.sort(**kwargs)
             return FunList(items)
 
-    def sum(self):
-        return sum(self)
+
+    def freq(self, fn=None) -> FunDict[T, int]:
+        freq_map = {}
+        l = self
+        if isinstance(self, dict):
+            l = self.values()
+        for v in l:
+            # If there's a match function, use it
+            if fn is not None and not fn(v):
+                continue
+            if not v in freq_map:
+                freq_map[v] = 0
+            freq_map[v] += 1
+        return FunDict(freq_map)
 
 
 class FunDict(Dict[K, V], _FunWrap):
     def __init__(self, d: Dict[K, V]):
         super().__init__(d)
 
-    def items(self) -> List[Tuple[K, V]]:
+    def items(self) -> FunList[Tuple[K, V]]:
         return FunList(super().items())
 
-    def keys(self) -> List[K]:
+    def keys(self) -> FunList[K]:
         return FunList(super().keys())
 
-    def values(self) -> List[V]:
+    def values(self) -> FunList[V]:
         return FunList(super().values())
 
-    def select(self, keys: Sequence[K]) -> Dict[K, V]:
+    def select(self, keys: Sequence[K]) -> FunDict[K,V]:
         d = FunDict({})
         for key in keys:
             alias = key
+            # If an entry in keys is tuple-like, rename the selected key
             if len(key) > 1:
                 key = key[0]
                 alias = key[1]
             d[alias] = self[key]
         return d
+    def kmap(self, fn: Callable[[K], O]) -> FunList[O]:
+        return FunList(map(fn, self.keys()))
 
-    def kfilter(self, fn: Callable[[K], bool]) -> Dict[K, V]:
+    def vmap(self, fn: Callable[[V], O]) -> FunList[O]:
+        return FunList(map(fn, self.values()))
+    def kfilter(self, fn: Callable[[K], bool]) -> FunDict[K, V]:
         kl = set(filter(fn, self.keys()))
         d = {}
         for k in self.keys():
@@ -123,22 +141,22 @@ class FunDict(Dict[K, V], _FunWrap):
                 d[k] = self[k]
         return FunDict(d)
 
-    def vfilter(self, fn: Callable[[V], bool]) -> Dict[K, V]:
+    def vfilter(self, fn: Callable[[V], bool]) -> FunDict[K, V]:
         d = {}
         for k, v in self.items():
             if fn(v):
                 d[k] = self[k]
         return FunDict(d)
 
-    def ksort(self, fn) -> Dict[K, V]:
+    def ksort(self, fn=lambda x: x) -> FunDict[K, V]:
         sorted_items = sorted(self.items(), key=lambda t: fn(t[0]))
         return FunDict(sorted_items)
 
-    def vsort(self, fn) -> Dict[K, V]:
+    def vsort(self, fn=lambda x: x) -> FunDict[K, V]:
         sorted_items = sorted(self.items(), key=lambda t: fn(t[1]))
         return FunDict(sorted_items)
 
-    def invert(self, smart_flatten=True) -> Dict[K, Sequence[V]]:
+    def invert(self, smart_flatten=True) -> FunDict[K, Sequence[V]]:
         if not len(self):
             return {}
         entry_types = {
@@ -202,7 +220,6 @@ class FunDict(Dict[K, V], _FunWrap):
                 ll += 1
         return ll
 
-
 class FunList(List[T], _FunWrap):
     def __init__(self, l=None):
         if not l:
@@ -216,22 +233,29 @@ class FunList(List[T], _FunWrap):
 
         return FunList(sliced)
 
-    def sort(self, **kwargs):
+    def sum(self):
+        return sum(self)
+
+    def sort(self, fn=None, **kwargs) -> FunList[T]:
+        if fn is not None:
+            if 'key' in kwargs:
+                raise RuntimeError("Cannot pass both a 'key' kwarg and a argument to sort!")
+            kwargs['key'] = fn
         return FunList(sorted(self, **kwargs))
 
-    def length(self):
+    def length(self) -> int:
         return len(self)
 
-    def filter(self, fn):
+    def filter(self, fn: Callable[[T], bool]) -> FunList[T]:
         return FunList(list(filter(fn, self)))
 
     def head(self):
         return self[0] if len(self) else None
 
-    def tail(self):
+    def tail(self) -> T:
         return self[-1] if len(self) else None
 
-    def flatten(self):
+    def flatten(self) -> FunList[Any]:
         nl = []
         for e in self:
             if isinstance(e, list):
@@ -241,7 +265,7 @@ class FunList(List[T], _FunWrap):
 
         return FunList(nl)
 
-    def flatten_dicts(self):
+    def flatten_dicts(self) -> FunDict[Any]:
         for e in self:
             if not isinstance(e, dict):
                 raise ValueError("All entries must be dicts")
@@ -306,6 +330,9 @@ def funwrap(collection: Iterable[T]):
         return FunList(collection)
     return collection
 
+class TestClass():
+    def dothing(self, x) -> FunFunDict[K,V]:
+        return FunDict(x)
 
 # Decorator
 def fun(func):
