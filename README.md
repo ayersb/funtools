@@ -24,7 +24,7 @@ This package provides a class and decorators that can be used to create versions
 A hypothetical example:
 
 ```python
-c = MyCachedCloudComputeApiClient(profile=/foo/bar/config)
+c = MyCachedCloudComputeApiClient(profile='/foo/bar/config')
 slist = c.list_regions() # Get a list of all regions from your cloud platform API
  .map(lambda r: c.list_compute(region=r.id)) # Fetches all VMs for each region, this could take a while
  .flatten() # Flatten the resulting lists
