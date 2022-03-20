@@ -1,2 +1,0 @@
-ipython3>=7.0.0
-pyperclip>=1.8.0

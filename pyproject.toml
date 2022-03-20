@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "funtools"
+version = "0.1.0"
+description = "Tools for interactive data manipulation in iPython Shell"
+authors = ["Brandon Ayers <brandon.ayers02@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pyperclip = "^1.8.2"
+ipython = "^8.1.1"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
