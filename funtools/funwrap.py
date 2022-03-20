@@ -34,7 +34,7 @@ def _fun_dict_map(fn, dictionary):
     return res
 
 
-class _FunWrap(Iterable[T]):
+class _FunWrap(Iterable):
     def pbcopy_json(self):
         self.pbcopy(as_json=True)
 
@@ -44,7 +44,7 @@ class _FunWrap(Iterable[T]):
             data = json.dumps(self, indent=2)
         pyperclip.copy(data)
 
-    def map(self, fn: Callable[[T], O]) -> Iterable[O]:
+    def map(self, fn: Callable[[T], O]) -> Iterable:
         """Returns a new FunCollection after applying fn to each element of the collection"""
         if isinstance(self, dict):
             res = _fun_dict_map(fn, self)
@@ -317,7 +317,7 @@ class FunSet(set, _FunWrap):
         return FunList(self)
 
 
-def funwrap(collection: Iterable[T]):
+def funwrap(collection: Iterable):
     def match(x, types):
         return bool(list(filter(lambda t: isinstance(x, t), types)))
 
